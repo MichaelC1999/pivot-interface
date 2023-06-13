@@ -3,6 +3,7 @@ import { Balance } from '../components/Balance'
 import { BlockNumber } from '../components/BlockNumber'
 import { Connect } from '../components/Connect'
 import { Connected } from '../components/Connected'
+import { Header } from '../components/Header'
 import { NetworkSwitcher } from '../components/NetworkSwitcher'
 import { ReadContract } from '../components/ReadContract'
 import { ReadContracts } from '../components/ReadContracts'
@@ -16,12 +17,13 @@ import { WatchContractEvents } from '../components/WatchContractEvents'
 import { WatchPendingTransactions } from '../components/WatchPendingTransactions'
 import { WriteContract } from '../components/WriteContract'
 import { WriteContractPrepared } from '../components/WriteContractPrepared'
+import DeployPool from './deploy/page'
 
 export default function Page() {
   return (
     <div>
       <h1>wagmi + Next.js</h1>
-      <Connect />
+      <Header />
       <Connected>
         <hr />
         <h2>Network</h2>
@@ -38,6 +40,9 @@ export default function Page() {
         <hr />
         <h2>Block Number</h2>
         <BlockNumber />
+        <br />
+        <hr />
+        <DeployPool />
         <br />
         <hr />
         <h2>Read Contract</h2>

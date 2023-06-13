@@ -1,3 +1,4 @@
+import Protocol from './protocol/page'
 import { Providers } from './providers'
 
 export const metadata = {
@@ -12,7 +13,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   )
