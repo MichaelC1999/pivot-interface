@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useContractRead } from 'wagmi'
 import ERC20ABI from "../ERC20.json";
+import SubgraphManagerABI from "../SubgraphManager.json";
 
 export function TokenBalance({ tokenAddress, addressToCheck, balanceSetter }: any) {
     const chainId: string = process.env.NEXT_PUBLIC_CHAIN_ID as string;

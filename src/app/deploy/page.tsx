@@ -5,36 +5,48 @@ import ProtocolReserveABI from "../../ProtocolReserveManager.json";
 import TestTokenABI from "../../TestTokenABI.json";
 
 import SubgraphListEntry from "../../contractFetchComponents/SubgraphListEntry";
-import { type Address, useContractRead, useContractWrite, useWaitForTransaction, useAccount } from 'wagmi'
+import { type Address, useContractRead, useContractWrite, useWaitForTransaction, useAccount, useConnect } from 'wagmi'
 import { stringToHex } from "viem";
 import { useRouter } from 'next/navigation'
 import { Header } from "../../components/Header";
+import { TokenApprove } from "../../fetchComponents/TokenApprove";
+import { useNetwork, useBalance } from 'wagmi'
+
 
 function DeployPool() {
     const router = useRouter()
-    const { address: userAddress } = useAccount()
+    const { chain, chains } = useNetwork()
+    const { connector: activeConnector, isConnected, address: userAddress } = useAccount()
+    const { connect, connectors, error, isLoading, pendingConnector } = useConnect()
 
-    const [isLoadingPoolDeployment, isLoadingPoolDeploymentSetter] = useState(false);
-    const [spendApproved, spendApprovedSetter] = useState(true);
-
-    const [initialSubgraph, initialSubgraphSetter] = useState("")
-    const [initialDepositAmount, initialDepositAmountSetter] = useState(0)
-    const [poolTitle, poolTitleSetter] = useState("")
+    const { data: balance } = useBalance({
+        address: '0x0165878A594ca255338adfa4d48449f69242Eb8F',
+    })
+    console.log(activeConnector, isConnected, balance, error)
 
     const tokenAddress: Address = process.env.NEXT_PUBLIC_TOKEN_CONTRACT_ADDRESS as Address; // Replace with the ERC20 token contract address
     const reserveAddr: Address = process.env.NEXT_PUBLIC_RESERVE_CONTRACT_ADDRESS as Address;
     const chainId: string = process.env.NEXT_PUBLIC_CHAIN_ID as string;
 
-    const { write, data: dataApproval } = useContractWrite({
-        abi: TestTokenABI,
-        address: tokenAddress,
-        functionName: 'approve',
+    const [isLoadingPoolDeployment, isLoadingPoolDeploymentSetter] = useState(false);
+    const [spendApproved, spendApprovedSetter] = useState(false);
+
+    const [tokenOnPool, tokenOnPoolSetter] = useState(tokenAddress)
+
+    const [initialSubgraph, initialSubgraphSetter] = useState("")
+    const [initialDepositAmount, initialDepositAmountSetter] = useState(0)
+    const [poolTitle, poolTitleSetter] = useState("")
+
+    const [permitSpend, permitSpendSetter] = useState(false);
+
+    const { data } = useContractRead({
+        abi: ProtocolReserveABI,
+        address: reserveAddr,
+        functionName: 'displaySubgraphList',
+        args: [],
+        enabled: true,
         chainId: Number(chainId)
     })
-
-    const {
-        isSuccess: isSuccessApproval,
-    } = useWaitForTransaction({ hash: dataApproval?.hash })
 
     const { write: writePool, data: dataPool } = useContractWrite({
         abi: ProtocolReserveABI,
@@ -49,13 +61,8 @@ function DeployPool() {
         isSuccess: isSuccessPool,
     } = useWaitForTransaction({ hash: dataPool?.hash })
 
-    const approveReserveSpend = async () => {
-        write({
-            args: [reserveAddr, 1],
-        })
-    }
-
     useEffect(() => {
+        console.log(isSuccessPool, 'isSuccessPool')
         if (isSuccessPool) {
             const txData: any = receiptPool
             router.push('/pool/' + txData.logs[0].address)
@@ -66,22 +73,9 @@ function DeployPool() {
         const title = stringToHex(poolTitle, { size: 32 })
         const poolId = stringToHex("123", { size: 32 })
         writePool({
-            args: [tokenAddress, title, (initialDepositAmount), initialSubgraph, poolId]
+            args: [tokenOnPool, title, (initialDepositAmount), initialSubgraph, poolId]
         })
     }
-
-    const { data } = useContractRead({
-        abi: ProtocolReserveABI,
-        address: reserveAddr,
-        functionName: 'displaySubgraphList',
-        args: [],
-        enabled: true,
-        chainId: Number(chainId)
-    })
-
-    useEffect(() => {
-        submitPoolCreation()
-    }, [isSuccessApproval])
 
     const subgraphList: string[] = []
     if (Array.isArray(data)) {
@@ -103,19 +97,31 @@ function DeployPool() {
 
     let approvalElement = null;
     let poolTitleElement = null;
+    let tokenAddressElement = null;
     let submitPoolCreationButton = null;
     if (initialSubgraph) {
-        approvalElement = <div><span>Pool Initial Deposit Amount: </span><input type="number" onChange={(x: any) => initialDepositAmountSetter(x.target.value)} /></div>
+        tokenAddressElement = <div><span>Pool Deposit Token Address: </span><input type="string" value={tokenOnPool} onChange={(x: any) => tokenOnPoolSetter(x.target.value)} /></div>
+        approvalElement = <div><span>Pool Initial Deposit Amount (18 decimal): </span><input type="number" onChange={(x: any) => initialDepositAmountSetter(x.target.value * (10 ** 18))} /></div>
         poolTitleElement = <div><span>Pool Name: </span><input type="text" onChange={(x) => poolTitleSetter(x.target.value)} /></div>
         submitPoolCreationButton = (<div><span onClick={() => {
             isLoadingPoolDeploymentSetter(true)
-            approveReserveSpend()
+            permitSpendSetter(true)
         }}>Create Pool</span></div>)
     }
 
     useEffect(() => {
-        submitPoolCreation()
+        if (spendApproved) {
+            submitPoolCreation()
+        }
     }, [spendApproved])
+
+    let permitFetch = null
+    if (permitSpend) {
+        permitFetch = <TokenApprove tokenAddress={tokenAddress} balance={initialDepositAmount} addressToApprove={reserveAddr} approvalLoadingSetter={() => null} permitSuccessSetter={(x: boolean) => {
+            permitSpendSetter(false)
+            spendApprovedSetter(x)
+        }} />
+    }
 
     return (<>
         <Header />
@@ -123,7 +129,9 @@ function DeployPool() {
             <h3>DeployPool Page</h3>
             <div style={{ width: "100%" }}>
                 {subgraphListElements}
+                {tokenAddressElement}
                 {approvalElement}
+                {permitFetch}
                 {poolTitleElement}
                 {submitPoolCreationButton}
             </div>
